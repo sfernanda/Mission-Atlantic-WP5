@@ -7,6 +7,7 @@
 library(tidyverse)
 library(corrplot)
 library(IEAtools)
+library(plyr)
 
 # Reef fish abundance data (sampling standardized)
 setwd("C:/Users/silva/Desktop/Mission-Atlantic-WP5")
@@ -42,10 +43,25 @@ fishdata$planktivore <- rowSums(fishdata[,c("chromis_flavicauda","chromis_jubaun
 
 names(fishdata)
 fishdata <- fishdata[,c(1,145:152)]
+
+#### Open predictors ####
+setwd('C:/Users/silva/Dropbox/Fernanda_Silva/Tese/Chapter_I')
+pressures <- read.table("DataBases/data_region_models.csv", sep = ";", dec = ".", h =T)
+pressures <- plyr::ddply(pressures, .(year), numcolwise(mean))
+pressures <- pressures[-1,c(1:6,9:14,17)]
+pressures[nrow(pressures) + 1,] <- c(2021, rep(NA, 12)) # 2021 has no data
+
 ### Normality --------------------------------
 # State: Inspect distributions and test for normality
 
 fishdata %>%
+  pivot_longer(-year, names_to = "ind", values_to = "val") %>%
+  ggplot(aes(val)) +
+  geom_histogram(aes(y=..density..)) +
+  geom_density(col = "red") +
+  facet_wrap(~ind, ncol = 5, scales = "free")
+
+pressures %>%
   pivot_longer(-year, names_to = "ind", values_to = "val") %>%
   ggplot(aes(val)) +
   geom_histogram(aes(y=..density..)) +
@@ -59,8 +75,14 @@ fishdata_trans <- fishdata
 fishdata_trans[ ,-1] <- fishdata_trans[ ,-1]^.25
 # fishdata_trans[ ,-1] <- log(fishdata_trans[ ,-1])
 
+# Bind 2 dataframes (indicators + pressures)
+fishdata2 <- cbind(fishdata_trans, pressures)
+
+################## Explore individual trends ####################
+
 # Visualize single (transformed) trends together: Traffic Light Plots
-trafficlight(x = fishdata_trans[,-1], time = fishdata_trans$year,
+# Indicators
+trafficlight(x = fishdata2[,-1], time = fishdata2$year,
              main = "TLP based on quantiles (sorted by first 5-yr mean)")
-trafficlight(x = fishdata_trans[,-1], time = fishdata_trans$year, method = "intervals",
+trafficlight(x = fishdata2[,-1], time = fishdata2$year, method = "intervals",
              main = "TLP based on evenly spaced intervals (sorted by first 5-yr mean)")
