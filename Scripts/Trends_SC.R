@@ -76,7 +76,7 @@ fishdata_trans[ ,-1] <- fishdata_trans[ ,-1]^.25
 # fishdata_trans[ ,-1] <- log(fishdata_trans[ ,-1])
 
 # Bind 2 dataframes (indicators + pressures)
-fishdata2 <- cbind(fishdata_trans, pressures)
+fishdata2 <- cbind(fishdata_trans, pressures[,-1])
 
 ################## Explore individual trends ####################
 
@@ -86,3 +86,28 @@ trafficlight(x = fishdata2[,-1], time = fishdata2$year,
              main = "TLP based on quantiles (sorted by first 5-yr mean)")
 trafficlight(x = fishdata2[,-1], time = fishdata2$year, method = "intervals",
              main = "TLP based on evenly spaced intervals (sorted by first 5-yr mean)")
+
+############################### Breakpoints in time  ######################################
+
+# Analysis should be done on time series without missing values
+names(fishdata)
+z <- ts(fishdata_trans[3:9], start = fishdata_trans$year[1],
+        end = fishdata_trans$year[length(fishdata_trans$year)], frequency = 1)
+
+
+# ==================== Bayesian changepoint algorithm  ======================
+
+library(bcp)
+
+bcp_z <- bcp(z, return.mcmc = TRUE)
+# invisible(capture.output(bcp_sum <- as.data.frame(summary(bcp_x))))
+plot(bcp_z)
+
+bcp_sum <- as.data.frame(summary(bcp_z))
+
+# Get year(s) with highest probability (> 0.7)
+invisible(capture.output(bcp_sum <- as.data.frame(summary(bcp_z))))
+bcp_sum$id <- 1:((length(z)/7))#divide with the number of indicators (I included 7)
+sel <- bcp_sum[which(bcp_z$posterior.prob > 0.7), ]
+drop1<-time(z)[sel$id]
+drop1<-as.data.frame(drop1)
