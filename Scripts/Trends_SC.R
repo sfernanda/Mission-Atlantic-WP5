@@ -8,6 +8,8 @@ library(tidyverse)
 library(corrplot)
 library(IEAtools)
 library(plyr)
+library(strucchange)
+library(bcp)
 
 # Reef fish abundance data (sampling standardized)
 setwd("C:/Users/silva/Desktop/Mission-Atlantic-WP5")
@@ -91,13 +93,11 @@ trafficlight(x = fishdata2[,-1], time = fishdata2$year, method = "intervals",
 
 # Analysis should be done on time series without missing values
 names(fishdata)
-z <- ts(fishdata_trans[3:9], start = fishdata_trans$year[1],
+z <- ts(fishdata_trans[6], start = fishdata_trans$year[1],
         end = fishdata_trans$year[length(fishdata_trans$year)], frequency = 1)
 
 
 # ==================== Bayesian changepoint algorithm  ======================
-
-library(bcp)
 
 bcp_z <- bcp(z, return.mcmc = TRUE)
 # invisible(capture.output(bcp_sum <- as.data.frame(summary(bcp_x))))
@@ -111,3 +111,49 @@ bcp_sum$id <- 1:((length(z)/7))#divide with the number of indicators (I included
 sel <- bcp_sum[which(bcp_z$posterior.prob > 0.7), ]
 drop1<-time(z)[sel$id]
 drop1<-as.data.frame(drop1)
+
+# ==================== Regression breakpoints algorithm  ======================
+
+# To test for specific number of breakpoints, nest a `breakpoints` function inside another
+breakpoints(breakpoints(z ~ 1), breaks = 1)
+# intercept 1 in this formula indicates that the function
+# should test for changes in the mean
+breakpoints(breakpoints(z ~ 1), breaks = 2)
+
+# Test for multiple breakpoints: the best model is automatically chosen based on BIC and RSS
+bp_z <- breakpoints(z ~ 1)
+bp_z
+summary(bp_z)
+# Plot BIC and RSS of models with different number of breakpoints
+plot(bp_z)
+
+n_brks <- length(bp_z$breakpoints)
+
+# Visualize results with CI around breaks and the means in each period
+ci_z <- confint(bp_z, breaks = n_brks)
+# you could remove breaks argument or use different number of cpts
+# Factor coding of segmentations
+tfac <- breakfactor(bp_z, breaks = n_brks)
+fm0 <- lm(z ~ 1)
+fm1 <- lm(z ~ tfac - 1)
+plot(z)
+lines(ci_z)
+lines(ts(fitted(fm0), start = fishdata_trans$year[1]), col = 3)
+lines(ts(fitted(fm1), start = fishdata_trans$year[1]), col = 4)
+lines(bp_z)
+
+par(mfrow = c(2,4))
+names(fishdata)
+z <- ts(fishdata_trans[9], start = fishdata_trans$year[1],
+        end = fishdata_trans$year[length(fishdata_trans$year)], frequency = 1)
+bp_z <- breakpoints(z ~ 1)
+n_brks <- length(bp_z$breakpoints)
+ci_z <- confint(bp_z, breaks = n_brks)
+tfac <- breakfactor(bp_z, breaks = n_brks)
+fm0 <- lm(z ~ 1)
+fm1 <- lm(z ~ tfac - 1)
+plot(z)
+lines(ci_z)
+lines(ts(fitted(fm0), start = fishdata_trans$year[1]), col = 3)
+lines(ts(fitted(fm1), start = fishdata_trans$year[1]), col = 4)
+lines(bp_z)
